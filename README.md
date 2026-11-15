@@ -1,4 +1,4 @@
-# teensy_Infrared_MLX90640
+# Teensy Infrared Thermal Camera with MLX90640
 
 A thermal camera project based on a Teensy 3.1 and an MLX90640 sensor.
 The design connects sensor acquisition over I2C to a Python desktop viewer over USB,
@@ -171,6 +171,8 @@ marked as synthetic and have no real subpages. Closing the app drains pending
 writes before exit. Captures are excluded from Git.
 
 ## Wiring
+
+![Teensy 3.1 to MLX90640 wiring with I2C pull-up resistors](docs/Teensy_MLX90640_wiring.png)
 
 | MLX90640 signal | Teensy 3.1 connection |
 | --- | --- |
