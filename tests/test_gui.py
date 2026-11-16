@@ -61,7 +61,7 @@ class DesktopTests(unittest.TestCase):
 
     def pixel_center(self, x, y):
         rect = self.window.canvas.image_rect()
-        return QtCore.QPointF(rect.left()+(x+0.5)*rect.width()/32,
+        return QtCore.QPointF(rect.left()+(31-x+0.5)*rect.width()/32,
                              rect.top()+(y+0.5)*rect.height()/24).toPoint()
 
     def test_webcam_buttons_disconnect_restart_and_close(self):
@@ -123,6 +123,27 @@ class DesktopTests(unittest.TestCase):
         self.window.active_settings['mode'] = 'Camera'
         self.window.latest = (values, 100, 1)
         self.window.redraw()
+
+    def test_horizontal_orientation_matches_readouts_and_recording(self):
+        from thermal_viewer.rendering import recording_image
+        values = np.tile(np.arange(32, dtype=float), (24, 1))
+        self.set_probe_image(values)
+        self.window.palette.setCurrentText('gray')
+        canvas = self.window.canvas
+        rect = canvas.image_rect()
+        left = QtCore.QPointF(rect.left()+rect.width()/64, rect.top()+rect.height()/48)
+        right = QtCore.QPointF(rect.right()-rect.width()/64, left.y())
+        self.assertEqual(canvas.pixel_at(left), (31, 0))
+        self.assertEqual(canvas.pixel_at(right), (0, 0))
+        np.testing.assert_array_equal(canvas.rgb[0, 0], [255, 255, 255])
+        np.testing.assert_array_equal(canvas.rgb[0, -1], [0, 0, 0])
+        QtTest.QTest.mouseClick(canvas, QtCore.Qt.MouseButton.LeftButton, pos=left.toPoint())
+        self.assertEqual(canvas.points, [(31, 0)])
+        self.assertIn('31.00 °C', self.window.point_readout.text())
+        image, _ = recording_image(values, 'gray', None, 'synthetic orientation check')
+        self.assertEqual(image.getpixel((0, 0)), (255, 255, 255))
+        self.assertEqual(image.getpixel((639, 0)), (0, 0, 0))
+        np.testing.assert_array_equal(canvas.values, values)
 
     def test_hover_and_pinned_temperature_follow_frames(self):
         values = np.arange(768, dtype=float)

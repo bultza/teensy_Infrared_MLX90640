@@ -71,7 +71,8 @@ class ThermalCanvas(QtWidgets.QWidget):
         # Right/bottom edges are exclusive; margins and the color bar are not sensor pixels.
         if not (rect.left() <= position.x() < rect.right() and rect.top() <= position.y() < rect.bottom()):
             return None
-        return (int((position.x()-rect.left())*32/rect.width()),
+        # The rendered image reverses columns; readouts retain original sensor coordinates.
+        return (31-int((position.x()-rect.left())*32/rect.width()),
                 int((position.y()-rect.top())*24/rect.height()))
 
     def pixel_text(self, point):
@@ -140,14 +141,15 @@ class ThermalCanvas(QtWidgets.QWidget):
         painter.drawImage(rect, image)
         # Draw numbered white crosses at sensor-cell centers, with a dark halo for contrast.
         for index, (x, y) in enumerate(self.points, 1):
-            center = QtCore.QPointF(rect.left()+(x+0.5)*rect.width()/32,
+            display_x = 31-x
+            center = QtCore.QPointF(rect.left()+(display_x+0.5)*rect.width()/32,
                                    rect.top()+(y+0.5)*rect.height()/24)
             radius = 6
             for color, thickness in (('#080d15', 4), ('white', 1.5)):
                 painter.setPen(QtGui.QPen(QtGui.QColor(color), thickness))
                 painter.drawLine(center+QtCore.QPointF(-radius, 0), center+QtCore.QPointF(radius, 0))
                 painter.drawLine(center+QtCore.QPointF(0, -radius), center+QtCore.QPointF(0, radius))
-            text_x = center.x()+8 if x < 30 else center.x()-18
+            text_x = center.x()+8 if display_x < 30 else center.x()-18
             text_y = center.y()-8 if y > 0 else center.y()+19
             painter.setPen(QtGui.QColor('#080d15'))
             painter.drawText(QtCore.QPointF(text_x+1, text_y+1), str(index))

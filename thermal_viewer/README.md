@@ -217,6 +217,11 @@ not additional sensor registers, and does not alter saved timelapse images.
 plus actual limits. Invalid pixels appear black. `recording_image` creates a
 640 × 512 PNG with timestamp, units, and display-range caption. UI and saved
 images therefore share the same palette/range calculations.
+RGB rendering reverses the columns to correct horizontal scene orientation in
+the viewer, webcam output, PNGs, and exported videos. Numeric matrices and raw
+subpages retain sensor order. Pointer mapping and cross positions apply the same
+reversal, so the leftmost displayed column corresponds to sensor column 31 and
+the rightmost to column 0; probe coordinates remain original sensor coordinates.
 
 ### Timelapse and export
 

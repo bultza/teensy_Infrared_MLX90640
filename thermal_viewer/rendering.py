@@ -18,6 +18,8 @@ def colorize(values, palette='inferno', limits=None):
     normalized = np.clip((np.where(finite, values, low) - low) / (high - low), 0, 1)
     rgb = (colormaps[palette](normalized)[..., :3] * 255).astype(np.uint8)
     rgb[~finite] = 0
+    # Reverse sensor columns for the scene orientation; keep measurements in sensor order.
+    rgb = np.ascontiguousarray(rgb[:, ::-1])
     return rgb, (low, high)
 
 

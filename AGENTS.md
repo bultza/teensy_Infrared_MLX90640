@@ -88,6 +88,10 @@
   coordinates. Support up to five distinct live probes with white numbered crosses
   and Reset points. Update values every frame, preserve pins on resize, and clear
   them on source restart. Hover/probes never issue additional I2C requests.
+  Shared RGB rendering reverses columns for scene orientation. Preserve original
+  numeric/raw sensor order; map display column x to sensor column 31-x for hit
+  testing and use the inverse mapping for probe crosses. Webcam/recordings reuse
+  the oriented RGB output without another flip.
 
 - Publication: keep captures/, example_code/, generated IDE/build files, and local
   account/agent configuration out of Git. Never publish real EEPROM dumps, sensor

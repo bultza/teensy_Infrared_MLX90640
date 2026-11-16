@@ -387,6 +387,16 @@ testing. Pointer coordinates map to zero-based sensor column/row, excluding the
 letterbox margins, color bar, and exclusive right/bottom edges. Hover reads the
 original latest numeric matrix, independently of palette or display clipping.
 
+Shared `colorize()` reverses RGB columns for the corrected scene orientation.
+The viewer, virtual webcam, and recording images therefore use the same horizontal
+orientation. Numeric measurements, saved NPZ values, and raw subpages stay in
+original sensor order. Hit testing maps display column x to sensor column 31-x;
+cross painting uses the inverse mapping. The left/right displayed edges represent
+sensor columns 31/0. Synthetic sources use the same rendering convention.
+An asymmetric synthetic-image Qt test checks edge colors, probe readings, recording
+orientation, and preservation of the numeric matrix; physical orientation remains
+subject to confirmation with the connected scene.
+
 Left-click pins up to five distinct coordinates; further clicks or duplicate
 coordinates leave the selection unchanged. White crosses with dark halos and
 numbers identify those cells. A persistent panel shows each current reading;

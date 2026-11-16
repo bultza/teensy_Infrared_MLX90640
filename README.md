@@ -128,6 +128,8 @@ restart** to stop the worker and start a new confirmed configuration. This also
 applies emissivity/reflected-temperature changes. Palette and automatic/fixed
 range are display-only controls. The normal camera scale is °C; test sources show
 synthetic counts. No sensor settings are written while acquisition is running.
+Rendered images reverse sensor columns to correct the horizontal orientation;
+the viewer, virtual webcam, and exported images share this orientation.
 
 Close the app or click Disconnect to stop acquisition. USB errors stay visible
 in the status area and terminal. Only one viewer or serial monitor uses a port at
