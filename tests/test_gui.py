@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 import numpy as np
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
@@ -62,6 +63,60 @@ class DesktopTests(unittest.TestCase):
         rect = self.window.canvas.image_rect()
         return QtCore.QPointF(rect.left()+(x+0.5)*rect.width()/32,
                              rect.top()+(y+0.5)*rect.height()/24).toPoint()
+
+    def test_webcam_buttons_disconnect_restart_and_close(self):
+        from thermal_viewer.webcam import VirtualWebcam
+        from test_webcam import FakeCamera
+        cameras = []
+
+        def factory(device):
+            def open_fake(**kwargs):
+                camera = FakeCamera(**kwargs)
+                cameras.append(camera)
+                return camera
+            return VirtualWebcam(device, camera_factory=open_fake)
+
+        with patch('thermal_viewer.gui.VirtualWebcam', side_effect=factory):
+            self.window.tabs.setCurrentIndex(1)
+            self.window.webcam_device.setText('/dev/video10')
+            self.click(self.window.webcam_button)
+            self.until(lambda: cameras and len(cameras[0].frames) >= 2)
+            self.assertEqual(cameras[0].options['device'], '/dev/video10')
+            self.assertFalse(self.window.webcam_device.isEnabled())
+            self.click(self.window.webcam_button)
+            self.until(lambda: self.window.webcam.finished.is_set() and self.window.webcam_device.isEnabled())
+            self.assertTrue(cameras[0].closed)
+            self.click(self.window.webcam_button)
+            self.until(lambda: len(cameras) == 2)
+            self.window.apply_settings()
+            self.until(lambda: cameras[1].closed and not self.window.restart_pending)
+            self.until(lambda: self.window.latest is not None and self.window.webcam_button.isEnabled())
+            self.click(self.window.webcam_button)
+            self.until(lambda: len(cameras) == 3)
+            self.window.disconnect_source()
+            self.until(lambda: cameras[2].closed)
+            self.window.connect_source()
+            self.until(lambda: self.window.latest is not None and self.window.webcam_button.isEnabled())
+            self.click(self.window.webcam_button)
+            self.until(lambda: len(cameras) == 4)
+            self.window.close()
+            self.until(lambda: not self.window.isVisible())
+            self.assertTrue(cameras[3].closed)
+
+    def test_webcam_failure_keeps_viewer_running(self):
+        from thermal_viewer.webcam import VirtualWebcam
+
+        def fail(**kwargs):
+            raise RuntimeError('test missing backend')
+
+        with patch('thermal_viewer.gui.VirtualWebcam',
+                   side_effect=lambda device: VirtualWebcam(device, camera_factory=fail)):
+            self.window.tabs.setCurrentIndex(1)
+            self.click(self.window.webcam_button)
+            self.until(lambda: 'test missing backend' in self.window.webcam_status.text())
+            self.assertEqual(self.window.active_mode, 'Demo')
+            self.assertTrue(self.window.webcam_button.isEnabled())
+            self.assertTrue(self.window.webcam_device.isEnabled())
 
     def set_probe_image(self, values):
         self.window.timer.stop()

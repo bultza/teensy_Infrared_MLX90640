@@ -57,12 +57,78 @@ are not overwritten; create the output directory before selecting an output path
 | [`radiometry.py`](radiometry.py) | Validated EEPROM-to-temperature adapter; converts each subpage with its own auxiliary measurements and masks defective pixels. |
 | [`rendering.py`](rendering.py) | Shared numeric-to-RGB palette/range conversion and PNG rendering for timelapse images. |
 | [`timelapse.py`](timelapse.py) | Monotonic capture selection, bounded writer queue, PNG/NPZ/metadata persistence, and finalized-session MP4 export. |
+| [`webcam.py`](webcam.py) | Optional pyvirtualcam backend, latest-frame mailbox, RGB enlargement, output cadence, stale-frame blanking, and asynchronous cleanup. |
 | [`diagnostics.py`](diagnostics.py) | One-shot status/control or EEPROM requests, structured error descriptions, capability checks, and terminal output. |
 | [`eeprom.py`](eeprom.py) | EEPROM response validation, checksums, summary output, and exclusive JSON backup creation. |
 | [`vendor/__init__.py`](vendor/__init__.py) | Marker for the third-party numerical routines. |
 | [`vendor/radiometry_math.py`](vendor/radiometry_math.py) | Host-only numerical routines adapted from Adafruit: parameter extraction, supply/ambient compensation, and object-temperature calculation. |
 | [`vendor/LICENSE_ADAFRUIT.txt`](vendor/LICENSE_ADAFRUIT.txt) | Original MIT license and copyright notice for those adapted numerical routines; it stays with the code. |
 | [`README.md`](README.md) | This package guide. |
+
+## Virtual webcam
+
+Install `requirements-webcam.txt` in the same environment as the viewer. Normal
+viewing and recording do not import or require pyvirtualcam. Start any source,
+including `--demo`, wait for an image, and open **Display → Virtual webcam**.
+The Device field accepts an explicit backend device; blank selects automatically.
+Click **Start virtual webcam** before selecting the camera in the receiving app.
+Click **Stop virtual webcam** to release it. Errors appear below the button and
+do not stop acquisition or timelapse. A failed output can be started again.
+
+### Linux setup
+
+The [pyvirtualcam backend](https://github.com/letmaik/pyvirtualcam#supported-virtual-cameras)
+uses [v4l2loopback](https://github.com/v4l2loopback/v4l2loopback).
+On Ubuntu/Debian:
+
+```bash
+sudo apt install v4l2loopback-dkms
+sudo modprobe v4l2loopback devices=1 video_nr=10 card_label=ThermalStudio exclusive_caps=1
+python -m thermal_viewer --demo
+```
+
+Use `/dev/video10` in the Device field, then select **ThermalStudio** in the
+receiving app. Choose a free device number if 10 is already occupied. With
+`exclusive_caps=1`, some clients only discover the camera after Python starts
+producing frames; reopen their camera selector if necessary. Loading the module
+requires administrator access after reboot; running the viewer does not.
+The application never invokes sudo or modifies kernel settings.
+
+If no device appears, check `ls /dev/video*` and `modinfo v4l2loopback`. A DKMS
+build needs matching kernel headers. If the module is already loaded, modprobe
+does not apply new options: use its existing loopback device or the upstream
+dynamic-device instructions. Check device permissions and close other producers
+if opening fails. Stop clients and output before changing the module setup.
+
+### Other platforms
+
+Windows uses an installed OBS virtual camera or Unity Capture. macOS uses the OBS
+virtual camera with the initialization described in the
+[backend setup guide](https://github.com/letmaik/pyvirtualcam#supported-virtual-cameras).
+Leave Device empty for automatic selection. These paths are not validated in this
+project; platform-specific driver installation remains external to the viewer.
+
+### Output and lifecycle
+
+Output is RGB at 640 × 480 / 30 FPS, enlarged with nearest-neighbor sampling from
+the original 32 × 24 image. Palette and range follow the display controls. The
+output contains the colored thermal image; pixel crosses, temperature readouts,
+and the sidebar remain desktop overlays. Demo/test-pattern output is synthetic.
+The webcam image carries colors rather than radiometric temperature data.
+
+A dedicated worker owns backend creation, resizing, sends, and cleanup. A locked
+single-image mailbox replaces older pending frames so slow output does not build
+a backlog. The latest image repeats between captures; 30 FPS does not increase
+sensor acquisition rate. After ten seconds without a new source image, output
+turns black until fresh data arrives. Display-only adjustments do not reset that
+timeout. Disconnect, source failure, camera restart, and window close request
+output shutdown; a restart requires clicking Start again. Window close waits
+asynchronously for backend cleanup. Timelapse remains independent and records
+fresh images under its existing schedule.
+
+Automated fake-backend tests cover repetition, colors, stale data, replacement,
+errors, and cleanup; Qt tests cover the buttons and source lifecycle. See the
+architecture validation section for any actual system-backend tests.
 
 ## How the files work together
 
@@ -73,6 +139,7 @@ __main__ → GUI on the main thread
               │    ├─ protocol: decode packets and pair subpages
               │    └─ radiometry → vendor math: calculate object temperatures
               ├─ rendering: map values to display colors
+              ├─ webcam output thread → pyvirtualcam → system virtual camera
               └─ timelapse writer thread → PNG / NPZ / JSON → MP4 export thread
 
 __main__ → diagnostics → protocol / eeprom     (console-only modes)

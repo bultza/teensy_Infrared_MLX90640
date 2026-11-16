@@ -10,7 +10,7 @@ The Python viewer displays 32 × 24 object temperatures in °C using each sensor
 EEPROM calibration and per-subpage auxiliary measurements. The Teensy acquires
 and sends raw subpages over USB. Python selects the I2C clock and sensor refresh
 rate before acquisition. The Qt desktop app adds configuration controls,
-timelapse recording, and MP4 export. The connected setup
+timelapse recording, MP4 export, and optional virtual webcam output. The connected setup
 measures approximately 1.97 complete FPS at the default 400 kHz / 2 FPS settings.
 
 ## Teensy development in VS Code
@@ -139,6 +139,29 @@ pixels show `unavailable`. Selections stay on the same sensor cells when resizin
 the window and clear when reconnecting/restarting the source. Probes use the
 received image in memory and make no additional I2C requests. Crosses/readouts are
 desktop overlays; the timelapse retains its existing image and measurement format.
+
+## Virtual webcam
+
+Install optional Python support in the activated virtual environment:
+
+```bash
+python -m pip install -r requirements-webcam.txt
+```
+
+On Ubuntu/Debian, install and activate the virtual camera device:
+
+```bash
+sudo apt install v4l2loopback-dkms
+sudo modprobe v4l2loopback devices=1 video_nr=10 card_label=ThermalStudio exclusive_caps=1
+```
+
+Connect a source, open **Display → Virtual webcam**, enter `/dev/video10`, and
+click **Start virtual webcam**. Then select **ThermalStudio** in the receiving
+application. The output uses the current palette/range at 640 × 480 / 30 FPS,
+repeating images between sensor captures; sensor resolution and acquisition FPS
+stay the same. Keep the viewer open. Disconnecting stops webcam output.
+See the [package guide](thermal_viewer/README.md#virtual-webcam) for platform setup,
+troubleshooting, and validation limits.
 
 ## Timelapse
 

@@ -6,7 +6,7 @@ The current firmware and host implement the version 1 framing and a simulated
 USB stream. The Teensy generates gradient subpages; the Python viewer reconstructs
 and displays them. Synthetic streaming makes no I2C transactions. An explicit diagnostic command
 reads the real status and control registers. Raw sensor acquisition and host-side radiometric conversion are implemented.
-Timelapse recording and MP4 export are implemented. Additional sensor settings
+Timelapse recording, MP4 export, and optional host virtual webcam output are implemented. Additional sensor settings
 remain design work. I2C clock and
 refresh are configurable from Python. The acquisition and recording sections below describe requirements, not
 implemented recording behavior.
@@ -423,8 +423,47 @@ an external USB-UART adapter. Typical device names are COMx on Windows,
 /dev/ttyACMx on Linux, and /dev/cu.usbmodem… on macOS. The conventional opening
 baud rate is 115200; it does not set the native USB transfer rate. See
 [PJRC USB Serial](https://www.pjrc.com/teensy/td_serial.html).
-CDC provides bidirectional access without a custom USB implementation. HID,
-custom USB, and webcam emulation provide no demonstrated benefit for this stage.
+CDC provides bidirectional access without a custom USB implementation. The host
+also supplies optional webcam output through pyvirtualcam; firmware USB remains CDC.
+
+## Host virtual webcam
+
+`webcam.py` owns an optional pyvirtualcam backend on a dedicated Python thread.
+Qt submits the rendered 24 × 32 RGB image and the source's monotonic reception
+timestamp through a locked latest-image mailbox. All backend operations, including
+opening, nearest-neighbor enlargement to 640 × 480, sending, and closing, run
+outside Qt and acquisition. Output uses a monotonic 30 FPS schedule that skips
+missed slots. It repeats the latest image without creating new sensor data.
+After ten seconds without a new source frame the worker sends black frames.
+Palette/range changes replace the RGB image without refreshing its source age.
+
+The GUI starts output explicitly from Display controls. Disconnect, acquisition
+failure, applying settings, and closing request shutdown. A new source requires
+an explicit webcam start. The GUI polls completion and errors and waits for output
+cleanup before closing, without joining a worker on the Qt thread. A backend
+failure releases its context and leaves viewing/recording available. The backend
+is external native code; a backend call that hangs can delay worker completion.
+
+The optional `requirements-webcam.txt` installs pyvirtualcam. Linux requires a
+separately installed/loaded v4l2loopback device; the program never changes kernel
+modules or privileges. The package guide documents installation and other backend
+platforms. This output transports display colors, without raw temperatures, probes,
+or the desktop scale. Native firmware UVC remains unimplemented.
+
+### Virtual webcam validation
+
+Fake-backend tests exercise output repetition and RGB scaling, latest-image
+replacement, stale-image blanking, backend errors, and resource release. Qt tests
+exercise start/stop, restart, source disconnect, failure feedback, and window close.
+System virtual-camera and receiving-application validation require a configured
+OS backend; no Windows/macOS validation is claimed.
+
+A Linux smoke test uses the Qt viewer with deterministic synthetic pixels and the
+actual pyvirtualcam/v4l2loopback backend at `/dev/video10`. A separate FFmpeg
+process captures three 640 × 480 RGB frames for each of inferno and gray palettes.
+Checks confirm nonblank images, colored versus grayscale channels, and clean
+output shutdown. This validates the local backend with FFmpeg; it does not test
+physical sensor acquisition, conferencing/browser clients, or other platforms.
 
 ## Acquisition baseline and limitations
 

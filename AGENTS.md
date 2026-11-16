@@ -94,3 +94,10 @@
   serials, or recorded thermal scenes as fixtures. Public radiometry vectors come
   from tools/make_synthetic_radiometry_input.py and the external Melexis reference.
   Retain third-party copyright/license attribution.
+
+- Optional host webcam output lives in webcam.py and uses pyvirtualcam on its own
+  worker thread. Keep its mailbox bounded to the latest RGB image; no Qt/backend
+  calls on the acquisition thread. Output repeats at 30 FPS, while sensor FPS stays
+  independent. Preserve source timestamps for ten-second stale-image blanking.
+  Disconnect/restart/failure/close stop output, and close waits asynchronously for
+  cleanup. Kernel-module setup stays external; firmware transport remains USB CDC.

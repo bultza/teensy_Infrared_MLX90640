@@ -13,6 +13,7 @@ from .receiver import run_serial
 from .rendering import PALETTES, colorize
 from .settings import configuration_payload
 from .timelapse import Timelapse, export_mp4
+from .webcam import VirtualWebcam
 
 STYLE = '''
 QWidget { background:#10151f; color:#e5eaf3; font-family:"DejaVu Sans"; font-size:12px; }
@@ -182,6 +183,7 @@ class Viewer(QtWidgets.QMainWindow):
         self.export_messages = queue.Queue()
         self.restart_pending = self.closing = False
         self.latest = None
+        self.webcam = None
         self.active_mode = None
         self.last_image_at = None
         self.active_settings = None
@@ -341,6 +343,31 @@ class Viewer(QtWidgets.QMainWindow):
         form.addRow(self.auto_range)
         form.addRow('Minimum', self.low)
         form.addRow('Maximum', self.high)
+        form = self.group('VIRTUAL WEBCAM')
+        self.webcam_device = QtWidgets.QLineEdit()
+        self.webcam_device.setPlaceholderText('Automatic (e.g. /dev/video10)')
+        self.webcam_button = QtWidgets.QPushButton('Start virtual webcam')
+        self.webcam_button.setEnabled(False)
+        self.webcam_button.clicked.connect(self.toggle_webcam)
+        self.webcam_status = QtWidgets.QLabel('640 × 480 / 30 FPS · repeats the latest image')
+        self.webcam_status.setWordWrap(True)
+        form.addRow('Device', self.webcam_device)
+        form.addRow(self.webcam_button)
+        form.addRow(self.webcam_status)
+
+    def toggle_webcam(self):
+        if self.webcam is not None and not self.webcam.finished.is_set():
+            self.webcam.stop()
+            self.webcam_button.setEnabled(False)
+        elif self.active_mode is not None and self.latest is not None:
+            self.webcam = VirtualWebcam(self.webcam_device.text().strip())
+            self.webcam.submit(self.canvas.rgb, self.last_image_at)
+            self.webcam_button.setText('Stop virtual webcam')
+            self.webcam_device.setEnabled(False)
+
+    def stop_webcam(self):
+        if self.webcam is not None:
+            self.webcam.stop()
 
     def _recording_controls(self):
         form = self.group('TIMELAPSE')
@@ -435,6 +462,7 @@ class Viewer(QtWidgets.QMainWindow):
             self.connect_source()
 
     def disconnect_source(self):
+        self.stop_webcam()
         self.stop_event.set()
         self.active_mode = None
         if self.recorder is not None:
@@ -467,6 +495,8 @@ class Viewer(QtWidgets.QMainWindow):
             self.status.setText(str(exc))
             return
         self.canvas.rgb, self.canvas.scale = rgb, scale
+        if self.webcam is not None and not self.webcam.finished.is_set():
+            self.webcam.submit(rgb, self.last_image_at)
         self.canvas.palette = self.palette.currentText()
         self.canvas.set_values(self.latest[0], '°C' if self.active_settings['mode'] == 'Camera' else 'counts')
         values = np.asarray(self.latest[0])
@@ -560,6 +590,7 @@ class Viewer(QtWidgets.QMainWindow):
             pass
         alive = self.worker is not None and self.worker.is_alive()
         if self.active_mode not in (None, 'Demo') and not alive:
+            self.stop_webcam()
             self.active_mode = None
             self.connect_button.setText('Connect')
             if self.recorder:
@@ -583,14 +614,25 @@ class Viewer(QtWidgets.QMainWindow):
             self.record_status.setText(self.export_messages.get_nowait())
         except queue.Empty:
             pass
-        if self.closing and not alive and not recording and not (self.export_thread and self.export_thread.is_alive()):
+        webcam_alive = self.webcam is not None and not self.webcam.finished.is_set()
+        if self.webcam is not None:
+            self.webcam_status.setText(self.webcam.status)
+        if not webcam_alive:
+            self.webcam_button.setText('Start virtual webcam')
+        self.webcam_device.setEnabled(not webcam_alive)
+        self.webcam_button.setEnabled(not self.closing and (
+            (webcam_alive and not self.webcam.stop_event.is_set()) or
+            (not webcam_alive and self.active_mode is not None and self.latest is not None)))
+        if self.closing and not alive and not recording and not webcam_alive and not (self.export_thread and self.export_thread.is_alive()):
             self.close()
 
     def closeEvent(self, event):
+        self.stop_webcam()
         alive = self.worker is not None and self.worker.is_alive()
         recording = self.recorder is not None and not self.recorder.finished
         exporting = self.export_thread is not None and self.export_thread.is_alive()
-        if alive or recording or exporting:
+        webcam_alive = self.webcam is not None and not self.webcam.finished.is_set()
+        if alive or recording or exporting or webcam_alive:
             self.closing = True
             self.restart_pending = False
             self.disconnect_source()

@@ -1,0 +1,14 @@
+Generation method: built-in image_gen tool.
+Reference pinout: docs/Teensy_Pinout_card7a_rev1.png.
+The final edit uses a generated vertical-board wiring draft as its target.
+
+Final edit prompt:
+Make only two precise corrections to this otherwise good wiring illustration. 1) GND is connected to the WRONG pad: move the gray ground wire endpoint from the SECOND hole down on the LEFT edge of the Teensy (currently near x146,y262) to the VERY FIRST TOPMOST left-edge gold hole (near x146,y221). That first hole is GND; the second hole is digital pin 0 and must have no wire. Move the GND label and its gray branch to align with the first/topmost hole. Keep the gray wire routed outside the board down the left and across bottom to camera GND. 2) The semicircular jump-over in the horizontal ORANGE SCL wire near its crossing with the BLUE R1 vertical wire is mistakenly colored blue: make the entire hump ORANGE, continuous with orange SCL on both sides. The blue R1 vertical lead remains BLUE and passes straight behind/below the orange jump-over with NO electrical junction dot at that crossing. Preserve all other components, exact labels, title, resistor branch connections, red supply wire, blue SDA wire, correct right-side pad placement, board orientation, and footer unchanged. Do not change any other pin or wire. This is a surgical electrical-correctness edit, not a redesign.
+
+Verified connection intent:
+- Teensy 3.3V to module 3.3V.
+- Teensy GND to module GND.
+- Teensy pin 18 / SDA to module SDA; R1 branches from SDA to 3.3V.
+- Teensy pin 19 / SCL to module SCL; R2 branches from SCL to 3.3V.
+- The camera connector order is illustrative; follow the actual module labels.
+- Resistor values are intentionally unspecified; check bus requirements and existing pull-ups.
